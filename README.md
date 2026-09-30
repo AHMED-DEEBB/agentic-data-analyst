@@ -6,6 +6,10 @@ Ask business questions in **Arabic or English** and get an answer, a chart, and 
 A LangGraph workflow of specialised agents plans the question, retrieves the relevant schema and business rules
 (hybrid RAG), writes SQL, validates it, runs it read-only, self-corrects on errors, and explains the result.
 
+| English | Arabic |
+|---|---|
+| ![English question with chart and agent steps](docs/demo-en.png) | ![Arabic question answered in Arabic](docs/demo-ar.png) |
+
 ## Why it matters
 
 "Talk to your data" is one of the most requested enterprise AI use cases, and most demos stop at a prompt that
