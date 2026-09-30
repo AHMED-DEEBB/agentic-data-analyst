@@ -1,0 +1,16 @@
+[project]
+name = "agentic-data-analyst"
+version = "1.0.0"
+description = "Multi-agent (LangGraph) data analyst: ask business questions in Arabic or English, get SQL, a chart and an insight."
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]  # long prompt strings are intentional
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

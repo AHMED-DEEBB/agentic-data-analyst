@@ -1,0 +1,76 @@
+# Tool: GitHub Actions. What: runs automated jobs on every push/PR.
+# Why: quality gate. Lint + guardrail tests run on every push (free, ~1 min).
+# The LLM eval suite runs only when triggered manually (Actions tab -> CI -> Run workflow),
+# so free-tier token limits aren't spent on every push. It fails if agent accuracy drops.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:   # adds a "Run workflow" button in the Actions tab
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: analyst_admin
+          POSTGRES_PASSWORD: admin
+          POSTGRES_DB: analyst
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U analyst_admin -d analyst"
+          --health-interval 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check .
+      - run: python -m app.bootstrap --skip-kb
+      - run: pytest -q
+        env:
+          RUN_DB_TESTS: "1"
+
+  evals:
+    needs: test
+    if: github.event_name == 'workflow_dispatch'   # manual runs only
+    runs-on: ubuntu-latest
+    env:
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: analyst_admin
+          POSTGRES_PASSWORD: admin
+          POSTGRES_DB: analyst
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U analyst_admin -d analyst"
+          --health-interval 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        if: env.GROQ_API_KEY != ''
+      - uses: actions/setup-python@v5
+        if: env.GROQ_API_KEY != ''
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+        if: env.GROQ_API_KEY != ''
+      - run: python -m app.bootstrap
+        if: env.GROQ_API_KEY != ''
+      - name: Eval quality gate (subset, free-tier friendly)
+        if: env.GROQ_API_KEY != ''
+        run: python -m evals.run_evals --limit 15 --delay 2 --min-overall 0.75
+      - uses: actions/upload-artifact@v4
+        if: always() && env.GROQ_API_KEY != ''
+        with:
+          name: eval-report
+          path: evals/results/

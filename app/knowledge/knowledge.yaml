@@ -1,0 +1,105 @@
+# The knowledge base the Schema agent retrieves from (RAG).
+# Three kinds of chunks:
+#   table    - what each table holds and its columns
+#   glossary - business definitions, so "revenue" or "active customer" mean ONE thing
+#   example  - verified question/SQL pairs used as few-shot examples
+# Arabic synonyms are included so Arabic questions match via keyword search too.
+
+tables:
+  - name: stores
+    description: Physical retail stores (branches) across the GCC. Every order is booked to one store, including online orders (fulfilling store).
+    columns: store_id (PK), name, city, country (UAE, Saudi Arabia, Qatar, Kuwait), opened_on (date)
+    synonyms: branch, location, mall, فرع, فروع, متجر, المتاجر
+
+  - name: customers
+    description: Customer master data. segment is 'Retail' (individuals) or 'Business' (companies).
+    columns: customer_id (PK), full_name, city, country, segment ('Retail' or 'Business'), signup_date (date)
+    synonyms: client, buyer, عميل, عملاء, زبون, الزبائن
+
+  - name: products
+    description: Product catalogue. category is one of Electronics, Home & Kitchen, Furniture, Fashion, Beauty, Sports. unit_price is the list price, unit_cost is the purchase cost, both in AED.
+    columns: product_id (PK), name, category, unit_price (AED), unit_cost (AED)
+    synonyms: item, SKU, category, منتج, منتجات, فئة, الفئات
+
+  - name: orders
+    description: Order headers. status is 'Completed', 'Cancelled' or 'Returned'. channel is 'Online' or 'In-Store'. Data covers 2024-01-01 to 2025-12-31.
+    columns: order_id (PK), customer_id (FK customers), store_id (FK stores), order_date (date), channel ('Online' or 'In-Store'), status ('Completed', 'Cancelled', 'Returned')
+    synonyms: sale, transaction, purchase, طلب, طلبات, مبيعات, أونلاين
+
+  - name: order_items
+    description: Order lines. unit_price is the price charged at the time of sale (AED). discount is a fraction between 0 and 1 (0.10 = 10%).
+    columns: order_item_id (PK), order_id (FK orders), product_id (FK products), quantity, unit_price (AED), discount (fraction 0-1)
+    synonyms: line item, basket, units sold, quantity, الكمية, الوحدات
+
+glossary:
+  - name: revenue
+    definition: "Revenue (sales) = SUM(order_items.quantity * order_items.unit_price * (1 - order_items.discount)) counting ONLY orders with status = 'Completed'. Always in AED."
+    synonyms: sales, turnover, income, الإيرادات, إيرادات, المبيعات, الدخل
+
+  - name: gross profit
+    definition: "Gross profit = SUM(order_items.quantity * (order_items.unit_price * (1 - order_items.discount) - products.unit_cost)) for Completed orders only. Gross margin % = gross profit / revenue * 100."
+    synonyms: profit, margin, الربح, الأرباح, هامش الربح
+
+  - name: number of orders
+    definition: "Order count = COUNT(DISTINCT orders.order_id). Unless the user asks about cancelled or returned orders, count only status = 'Completed'."
+    synonyms: order count, how many orders, عدد الطلبات
+
+  - name: average order value
+    definition: "AOV = revenue / number of Completed orders."
+    synonyms: AOV, basket size, average basket, متوسط قيمة الطلب
+
+  - name: units sold
+    definition: "Units sold = SUM(order_items.quantity) for Completed orders only."
+    synonyms: quantity sold, volume, الوحدات المباعة, الكمية المباعة
+
+  - name: cancellation rate
+    definition: "Cancellation rate % = orders with status 'Cancelled' / all orders * 100. Return rate uses status 'Returned' the same way."
+    synonyms: cancel rate, return rate, نسبة الإلغاء, نسبة المرتجعات
+
+  - name: active customer
+    definition: "An active customer placed at least one Completed order in the period asked about."
+    synonyms: active client, العملاء النشطين
+
+  - name: dates and periods
+    definition: "Use orders.order_date for time filters. Data covers 2024 and 2025 only. Use date_trunc('month', order_date) for monthly trends and EXTRACT(YEAR FROM order_date) for years. Q1 = Jan-Mar."
+    synonyms: month, year, quarter, trend, شهر, سنة, ربع, الشهري
+
+examples:
+  - question: What was total revenue in 2025?
+    sql: |
+      SELECT ROUND(SUM(oi.quantity * oi.unit_price * (1 - oi.discount)), 2) AS revenue
+      FROM order_items oi JOIN orders o ON o.order_id = oi.order_id
+      WHERE o.status = 'Completed' AND o.order_date >= '2025-01-01' AND o.order_date < '2026-01-01'
+
+  - question: Revenue by country in 2024
+    sql: |
+      SELECT s.country, ROUND(SUM(oi.quantity * oi.unit_price * (1 - oi.discount)), 2) AS revenue
+      FROM order_items oi
+      JOIN orders o ON o.order_id = oi.order_id
+      JOIN stores s ON s.store_id = o.store_id
+      WHERE o.status = 'Completed' AND EXTRACT(YEAR FROM o.order_date) = 2024
+      GROUP BY s.country ORDER BY revenue DESC
+
+  - question: Monthly revenue trend for 2025
+    sql: |
+      SELECT date_trunc('month', o.order_date)::date AS month,
+             ROUND(SUM(oi.quantity * oi.unit_price * (1 - oi.discount)), 2) AS revenue
+      FROM order_items oi JOIN orders o ON o.order_id = oi.order_id
+      WHERE o.status = 'Completed' AND EXTRACT(YEAR FROM o.order_date) = 2025
+      GROUP BY 1 ORDER BY 1
+
+  - question: Top 3 categories by gross profit
+    sql: |
+      SELECT p.category,
+             ROUND(SUM(oi.quantity * (oi.unit_price * (1 - oi.discount) - p.unit_cost)), 2) AS gross_profit
+      FROM order_items oi
+      JOIN orders o ON o.order_id = oi.order_id
+      JOIN products p ON p.product_id = oi.product_id
+      WHERE o.status = 'Completed'
+      GROUP BY p.category ORDER BY gross_profit DESC LIMIT 3
+
+  - question: Cancellation rate by channel
+    sql: |
+      SELECT channel,
+             ROUND(100.0 * COUNT(*) FILTER (WHERE status = 'Cancelled') / COUNT(*), 2) AS cancellation_rate_pct
+      FROM orders GROUP BY channel ORDER BY channel

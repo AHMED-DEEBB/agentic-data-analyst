@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agentic Data Analyst</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #eef2f4; --panel: #ffffff; --ink: #1b2a3a; --muted: #5d6b79;
+    --line: #d5dde3; --accent: #0f7b6c; --accent-soft: #e2f1ee; --warn: #b3541e;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.55 "IBM Plex Sans Arabic", system-ui, sans-serif; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 40px 24px 64px;
+    display: grid; grid-template-columns: 360px 1fr; gap: 32px; }
+  header { grid-column: 1 / -1; }
+  h1 { font-size: 1.75rem; font-weight: 600; margin: 0 0 4px; letter-spacing: -0.01em; }
+  header p { margin: 0; color: var(--muted); max-width: 62ch; }
+  form { display: flex; flex-direction: column; gap: 10px; }
+  textarea { width: 100%; min-height: 96px; resize: vertical; padding: 14px; font: inherit;
+    border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--ink); }
+  textarea:focus-visible, button:focus-visible, .chip:focus-visible, summary:focus-visible {
+    outline: 3px solid var(--accent); outline-offset: 2px; }
+  button[type=submit] { align-self: flex-start; padding: 10px 20px; border: 0; border-radius: 8px;
+    background: var(--accent); color: #fff; font: inherit; font-weight: 500; cursor: pointer; }
+  button[disabled] { opacity: .55; cursor: wait; }
+  .examples { margin-top: 22px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .examples h2, .trail h2 { width: 100%; font-size: .95rem; font-weight: 600; margin: 0 0 2px; }
+  .chip { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px;
+    padding: 6px 12px; font: inherit; font-size: .9rem; cursor: pointer; text-align: start; }
+  .chip:hover { border-color: var(--accent); }
+  .trail { margin-top: 28px; }
+  .trail ol { list-style: none; margin: 8px 0 0; padding: 0; counter-reset: s; }
+  .trail li { counter-increment: s; position: relative; padding: 0 0 14px 34px; font-size: .9rem; }
+  .trail li::before { content: counter(s); position: absolute; left: 0; top: 1px; width: 22px; height: 22px;
+    border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-size: .75rem;
+    display: grid; place-items: center; font-weight: 600; }
+  .trail li.bad::before { background: #f7e6dc; color: var(--warn); }
+  .trail li:not(:last-child)::after { content: ""; position: absolute; left: 10.5px; top: 25px; bottom: 2px;
+    width: 1px; background: var(--line); }
+  .trail b { font-weight: 600; }
+  .trail span { color: var(--muted); display: block; overflow-wrap: anywhere; }
+  main { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 28px; min-height: 420px; }
+  .empty { color: var(--muted); max-width: 46ch; }
+  .answer { font-size: 1.3rem; line-height: 1.5; margin: 0 0 20px; max-width: 60ch; }
+  .answer.refused { color: var(--warn); font-size: 1.1rem; }
+  .chart { position: relative; height: 300px; margin-bottom: 24px; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; max-height: 320px; }
+  table { border-collapse: collapse; width: 100%; font-size: .9rem; font-variant-numeric: tabular-nums; }
+  th, td { padding: 8px 12px; border-bottom: 1px solid var(--line); text-align: start; white-space: nowrap; }
+  th { position: sticky; top: 0; background: #f6f8f9; font-weight: 600; }
+  details { margin-top: 18px; }
+  summary { cursor: pointer; color: var(--muted); font-size: .9rem; }
+  pre { background: #f6f8f9; border: 1px solid var(--line); border-radius: 10px; padding: 14px;
+    overflow-x: auto; font-size: .85rem; direction: ltr; text-align: left; }
+  .meta { color: var(--muted); font-size: .85rem; margin-top: 14px; }
+  @media (max-width: 860px) { .wrap { grid-template-columns: 1fr; } }
+  @media (prefers-reduced-motion: no-preference) { .trail li { animation: in .25s ease-out; } }
+  @keyframes in { from { opacity: 0; transform: translateY(4px); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Agentic Data Analyst</h1>
+    <p>Ask about sales, products, customers or stores in English or Arabic. A team of agents writes the query, checks it, runs it read-only and explains the result.</p>
+  </header>
+
+  <aside>
+    <form id="ask">
+      <label for="q" class="sr">Your question</label>
+      <textarea id="q" dir="auto" placeholder="e.g. Revenue by country in 2025" required></textarea>
+      <button type="submit" id="go">Ask</button>
+    </form>
+
+    <div class="examples">
+      <h2>Try one</h2>
+      <button class="chip">Monthly revenue trend for 2025</button>
+      <button class="chip">Top 5 products by revenue</button>
+      <button class="chip">Gross profit by category in 2024</button>
+      <button class="chip" dir="rtl">ما هي الإيرادات حسب الفئة في 2024؟</button>
+      <button class="chip" dir="rtl">قارن إيرادات الأونلاين والفروع في 2025</button>
+      <button class="chip">Delete all cancelled orders</button>
+    </div>
+
+    <div class="trail" hidden id="trailBox">
+      <h2>What the agents did</h2>
+      <ol id="trail"></ol>
+    </div>
+  </aside>
+
+  <main id="out">
+    <p class="empty">Answers appear here with a chart, the data behind them and the exact query that produced them.</p>
+  </main>
+</div>
+
+<script>
+const LABELS = { planner: "Planner", retrieve: "Schema lookup", write_sql: "SQL writer", repair_sql: "SQL repair",
+  validate: "Validator", execute: "Database (read-only)", insight: "Insight", refuse: "Refused", fail: "Stopped" };
+const $ = (id) => document.getElementById(id);
+let chart;
+
+document.querySelectorAll(".chip").forEach((b) => b.addEventListener("click", () => { $("q").value = b.textContent; run(); }));
+$("ask").addEventListener("submit", (e) => { e.preventDefault(); run(); });
+$("q").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); run(); } });
+
+function esc(s) { return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+function addStep(ev) {
+  const li = document.createElement("li");
+  if (/rejected|error/.test(ev.detail) || ev.step === "refuse" || ev.step === "fail") li.className = "bad";
+  li.innerHTML = `<b>${LABELS[ev.step] || ev.step}</b><span>${esc(ev.detail)}${ev.ms ? ` · ${ev.ms} ms` : ""}</span>`;
+  $("trail").appendChild(li);
+}
+
+async function run() {
+  const question = $("q").value.trim();
+  if (question.length < 2) return;
+  $("go").disabled = true; $("go").textContent = "Working…";
+  $("trail").innerHTML = ""; $("trailBox").hidden = false;
+  $("out").innerHTML = `<p class="empty">Working on it…</p>`;
+  try {
+    const res = await fetch("/ask/stream", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question }) });
+    if (!res.ok) throw new Error(`Request failed (${res.status}). Check the question length and try again.`);
+    const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = "";
+    while (true) {
+      const { value, done } = await reader.read(); if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const parts = buf.split("\n\n"); buf = parts.pop();
+      for (const p of parts) {
+        if (!p.startsWith("data: ")) continue;
+        const ev = JSON.parse(p.slice(6));
+        if (ev.type === "step") addStep(ev);
+        else if (ev.type === "result") render(ev);
+        else if (ev.type === "error") throw new Error(`The agent stopped (${ev.detail}). Check the API key and model in .env.`);
+      }
+    }
+  } catch (err) {
+    $("out").innerHTML = `<p class="answer refused">${esc(err.message)}</p>`;
+  } finally {
+    $("go").disabled = false; $("go").textContent = "Ask";
+  }
+}
+
+function render(r) {
+  const out = $("out");
+  if (chart) { chart.destroy(); chart = null; }
+  if (r.status !== "ok") { out.innerHTML = `<p class="answer refused" dir="auto">${esc(r.answer)}</p>`; return; }
+  const head = r.columns.map((c) => `<th>${esc(c)}</th>`).join("");
+  const body = r.rows.map((row) => `<tr>${row.map((v) => `<td>${esc(typeof v === "number" ? v.toLocaleString() : v)}</td>`).join("")}</tr>`).join("");
+  out.innerHTML = `
+    <p class="answer" dir="auto">${esc(r.answer)}</p>
+    ${r.chart ? `<div class="chart"><canvas id="c" aria-label="${esc(r.chart.title || "Chart")}"></canvas></div>` : ""}
+    <div class="table-wrap"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>
+    <details><summary>Query used</summary><pre>${esc(r.sql)}</pre></details>
+    <p class="meta">${r.rows.length} rows · ${(r.latency_ms / 1000).toFixed(1)} s · ${r.attempts ? `self-corrected ${r.attempts}×` : "first attempt"}</p>`;
+  if (r.chart) drawChart(r);
+}
+
+function drawChart(r) {
+  const xi = r.columns.indexOf(r.chart.x), yi = r.columns.indexOf(r.chart.y);
+  const palette = ["#0f7b6c", "#2f5d8a", "#c8a24a", "#7a4f9a", "#b3541e", "#4d8f3a", "#8a8f98", "#1b2a3a"];
+  chart = new Chart($("c"), {
+    type: r.chart.type,
+    data: { labels: r.rows.map((row) => row[xi]),
+      datasets: [{ label: r.chart.y, data: r.rows.map((row) => row[yi]),
+        backgroundColor: r.chart.type === "pie" ? palette : "#0f7b6c", borderColor: "#0f7b6c", borderWidth: r.chart.type === "line" ? 2 : 0, tension: .25 }] },
+    options: { maintainAspectRatio: false, plugins: { legend: { display: r.chart.type === "pie" },
+      title: { display: !!r.chart.title, text: r.chart.title, font: { family: "IBM Plex Sans Arabic", size: 14, weight: "600" } } },
+      scales: r.chart.type === "pie" ? {} : { y: { beginAtZero: true, grid: { color: "#e6ebef" } }, x: { grid: { display: false } } } },
+  });
+}
+</script>
+<style>.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }</style>
+</body>
+</html>
